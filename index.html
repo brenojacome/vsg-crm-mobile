@@ -1,0 +1,2033 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>CRM · Visagio</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700&family=Open+Sans+Condensed:wght@300;400;700&display=swap" rel="stylesheet" />
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* ─── Reset ─────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    button { font-family: inherit; }
+    input, select, textarea { font-family: inherit; }
+
+    /* ─── Tokens ─────────────────────────────────── */
+    :root {
+      --teal:       #00363D;
+      --teal-h:     #004A47;
+      --mint:       #A9FDAC;
+      --sand:       #D6D5C9;
+      --offwhite:   #F7F3F5;
+      --fg-muted:   #4D6066;
+      --fg-subtle:  #7D8B8F;
+      --border:     rgba(0,54,61,0.12);
+      --border-in:  rgba(0,54,61,0.24);
+      --danger:     #C0392B;
+      --sh-card:    0 2px 4px rgba(0,54,61,0.04), 0 12px 32px rgba(0,54,61,0.08);
+      --sh-fab:     0 8px 24px rgba(0,54,61,0.20);
+      --font-t:     'Titillium Web', system-ui, sans-serif;
+      --font-b:     'Open Sans Condensed', system-ui, sans-serif;
+    }
+
+    /* ─── Base ───────────────────────────────────── */
+    html, body {
+      height: 100%;
+      background: #111;
+      font-family: var(--font-b);
+      color: var(--teal);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── App shell — centered phone column ─────── */
+    #app {
+      position: relative;
+      height: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      background: var(--offwhite);
+      overflow: hidden;
+    }
+
+    /* ─── Screen System ──────────────────────────── */
+    /*
+       Every screen is position:absolute, full-bleed.
+       .active  → visible at translateX(0)
+       default  → off-screen to the right (translateX(100%))
+       .exit    → slides left when going back (translateX(-30%))
+       #screen-login is special: always at X=0 unless .hidden
+    */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--offwhite);
+      transform: translateX(100%);
+      transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+      will-change: transform;
+      overflow: hidden;
+    }
+    .screen.active { transform: translateX(0); }
+    .screen.exit   { transform: translateX(-25%); }
+
+    #screen-login {
+      transform: translateX(0);
+      transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    #screen-login.exit { transform: translateX(-100%); }
+
+    /* ─── Header bar ─────────────────────────────── */
+    .hdr {
+      height: 56px;
+      background: var(--teal);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      flex-shrink: 0;
+      /* iOS safe area */
+      padding-top: env(safe-area-inset-top, 0px);
+      height: calc(56px + env(safe-area-inset-top, 0px));
+    }
+    .hdr-back {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px; height: 32px;
+      margin-left: -6px;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hdr-title {
+      flex: 1;
+      font-family: var(--font-t);
+      font-weight: 700;
+      font-size: 22px;
+      color: var(--offwhite);
+      letter-spacing: -0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hdr-fab {
+      background: var(--teal);
+      border: 1px solid var(--mint);
+      color: var(--mint);
+      padding: 8px 14px;
+      border-radius: 9999px;
+      font-family: var(--font-t);
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: var(--sh-fab);
+      white-space: nowrap;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ─── Screen body (scrollable) ───────────────── */
+    .body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      padding-bottom: max(80px, calc(60px + env(safe-area-inset-bottom, 0px)));
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    /* ─── Buttons ────────────────────────────────── */
+    .btn-p {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      height: 52px;
+      background: var(--teal);
+      color: var(--offwhite);
+      border: none;
+      border-radius: 9999px;
+      font-family: var(--font-t);
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      letter-spacing: 0.1px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-p:disabled { opacity: 0.4; cursor: default; }
+    .btn-p:not(:disabled):active { opacity: 0.82; }
+
+    .btn-s {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      height: 52px;
+      background: transparent;
+      color: var(--teal);
+      border: 1.5px solid var(--teal);
+      border-radius: 9999px;
+      font-family: var(--font-t);
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-s:active { opacity: 0.75; }
+
+    .btn-t {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font-b);
+      font-size: 13px;
+      color: var(--fg-muted);
+      padding: 10px 12px;
+      text-align: center;
+      width: 100%;
+      display: block;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-t.danger { color: var(--danger); }
+
+    /* ─── Form Fields ────────────────────────────── */
+    .field { margin-bottom: 16px; }
+    .field-lbl {
+      font-family: var(--font-b);
+      font-size: 12px;
+      color: var(--fg-muted);
+      margin-bottom: 6px;
+      letter-spacing: 0.2px;
+      display: block;
+    }
+    .field-lbl .req { color: var(--teal); margin-left: 2px; }
+    .fi, .fs, .fta {
+      width: 100%;
+      height: 48px;
+      background: #fff;
+      border: 1px solid var(--border-in);
+      border-radius: 12px;
+      padding: 0 14px;
+      font-family: var(--font-b);
+      font-size: 14px;
+      color: var(--teal);
+      outline: none;
+      transition: border 0.15s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .fi:focus, .fs:focus, .fta:focus {
+      border: 2px solid var(--teal);
+    }
+    .fi::placeholder, .fta::placeholder { color: var(--fg-subtle); }
+    .fi.err { border: 2px solid var(--danger) !important; }
+    .ferr { font-family: var(--font-b); font-size: 12px; color: var(--danger); margin-top: 4px; }
+    .fhint { font-family: var(--font-b); font-size: 11px; color: var(--fg-subtle); margin-top: 4px; }
+
+    .fta {
+      height: 100px;
+      padding: 12px 14px;
+      resize: none;
+      line-height: 1.45;
+    }
+
+    /* Select with arrow */
+    .fs {
+      background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5l4 4 4-4' stroke='%237D8B8F' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+      cursor: pointer;
+    }
+
+    /* Autocomplete */
+    .ac-wrap { position: relative; }
+    .ac-list {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0; right: 0;
+      background: #fff;
+      border: 1px solid var(--border-in);
+      border-radius: 12px;
+      box-shadow: var(--sh-card);
+      z-index: 200;
+      max-height: 210px;
+      overflow-y: auto;
+      display: none;
+    }
+    .ac-item {
+      padding: 12px 14px;
+      font-family: var(--font-b);
+      font-size: 14px;
+      color: var(--teal);
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+    }
+    .ac-item:last-child { border-bottom: none; }
+    .ac-item:active { background: var(--offwhite); }
+
+    /* Search bar */
+    .srch {
+      height: 44px;
+      background: var(--sand);
+      border-radius: 9999px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .srch input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: var(--font-b);
+      font-size: 14px;
+      color: var(--teal);
+    }
+    .srch input::placeholder { color: var(--fg-muted); }
+
+    /* Section label */
+    .sec-lbl {
+      font-family: var(--font-b);
+      font-size: 11px;
+      color: var(--fg-subtle);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      margin: 20px 0 10px;
+    }
+    .sec-lbl:first-child, .sec-lbl.mt0 { margin-top: 8px; }
+
+    /* ─── Item Card ──────────────────────────────── */
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--sh-card);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .card:active { opacity: 0.82; }
+    .card-ico {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: var(--sand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .card-body { flex: 1; min-width: 0; }
+    .card-title {
+      font-family: var(--font-t);
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--teal);
+      letter-spacing: 0.1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-sub {
+      font-family: var(--font-b);
+      font-size: 13px;
+      color: var(--fg-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ─── Lead Card ──────────────────────────────── */
+    .lead-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--sh-card);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lead-card:active { opacity: 0.82; }
+    .lead-top { display: flex; align-items: center; gap: 14px; }
+    .lead-bot {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .lead-date { font-family: var(--font-b); font-size: 12px; color: var(--fg-muted); }
+
+    /* ─── Status Tag ─────────────────────────────── */
+    .stag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-family: var(--font-t);
+      font-weight: 400;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    .s-prosp  { background: var(--sand);   color: var(--teal); }
+    .s-qual   { background: var(--teal);   color: var(--sand); }
+    .s-prop   { background: var(--teal);   color: var(--mint); }
+    .s-neg    { background: var(--teal-h); color: var(--mint); }
+    .s-ganho  { background: #22c55e;       color: #fff; }
+    .s-perdido{ background: #f43f5e;       color: #fff; }
+
+    /* ─── Tab filter ─────────────────────────────── */
+    .tabs { display: flex; gap: 10px; margin-bottom: 8px; }
+    .tab {
+      padding: 8px 18px;
+      border-radius: 9999px;
+      border: 1.5px solid var(--teal);
+      background: transparent;
+      color: var(--teal);
+      font-family: var(--font-t);
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab.on { background: var(--teal); color: var(--mint); }
+
+    /* ─── Skeleton ───────────────────────────────── */
+    .skel {
+      background: var(--sand);
+      border-radius: 16px;
+      height: 64px;
+      margin-bottom: 10px;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+    @keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:.45} }
+
+    /* ─── Empty state ────────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 48px 20px;
+      font-family: var(--font-b);
+      font-size: 14px;
+      color: var(--fg-subtle);
+      line-height: 1.6;
+    }
+
+    /* ─── Meta footer ────────────────────────────── */
+    .meta {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-b);
+      font-size: 11px;
+      color: var(--fg-subtle);
+      text-align: center;
+    }
+
+    /* ─── Grid 2 col ─────────────────────────────── */
+    .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* ─── Mini contact ───────────────────────────── */
+    .mini-c {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+    }
+    .mini-c-ava {
+      width: 30px; height: 30px;
+      border-radius: 9px;
+      background: var(--sand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .mini-c-name { font-family: var(--font-t); font-weight: 600; font-size: 14px; color: var(--teal); }
+    .mini-c-sub  { font-family: var(--font-b); font-size: 12px; color: var(--fg-muted); }
+    .mini-c-div  { height: 1px; background: var(--border); margin-left: 56px; }
+    .mini-c-wrap { background: #fff; border-radius: 16px; box-shadow: var(--sh-card); overflow: hidden; }
+
+    /* ─── History entry ──────────────────────────── */
+    .hist {
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--sh-card);
+    }
+    .hist-hdr { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+    .hist-date {
+      font-family: var(--font-t);
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--teal);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      background: var(--mint);
+      padding: 2px 8px;
+      border-radius: 9999px;
+      white-space: nowrap;
+    }
+    .hist-title { font-family: var(--font-t); font-weight: 600; font-size: 14px; color: var(--teal); }
+    .hist-body {
+      font-family: var(--font-b);
+      font-size: 13px;
+      color: var(--fg-muted);
+      line-height: 1.45;
+    }
+
+    /* ─── Toast ──────────────────────────────────── */
+    .toast {
+      position: absolute;
+      left: 20px; right: 20px;
+      bottom: max(28px, calc(20px + env(safe-area-inset-bottom, 0px)));
+      background: var(--teal);
+      color: var(--mint);
+      padding: 14px 20px;
+      border-radius: 9999px;
+      font-family: var(--font-t);
+      font-weight: 600;
+      font-size: 14px;
+      text-align: center;
+      box-shadow: var(--sh-fab);
+      z-index: 9999;
+      pointer-events: none;
+      animation: toastIn .3s ease-out;
+    }
+    @keyframes toastIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ─── Confirm modal (bottom sheet) ──────────── */
+    .modal-bg {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,54,61,.45);
+      z-index: 8000;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      display: none;
+    }
+    .modal-bg.open { display: flex; }
+    .modal-sheet {
+      background: #fff;
+      border-radius: 24px 24px 0 0;
+      padding: 24px 24px max(36px, calc(20px + env(safe-area-inset-bottom, 0px)));
+      width: 100%;
+    }
+    .modal-ttl {
+      font-family: var(--font-t);
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--teal);
+      margin-bottom: 8px;
+    }
+    .modal-body {
+      font-family: var(--font-b);
+      font-size: 14px;
+      color: var(--fg-muted);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .modal-acts { display: flex; flex-direction: column; gap: 8px; }
+
+    /* ─── Spinner ────────────────────────────────── */
+    .spin {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid var(--mint);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: rotate .7s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes rotate { to{transform:rotate(360deg)} }
+
+    /* ════════════════════════════════════════════════
+       LOGIN SCREEN
+    ════════════════════════════════════════════════ */
+    #screen-login { background: var(--offwhite); }
+
+    .login-hero {
+      background: var(--teal);
+      flex-shrink: 0;
+      /* 35% of viewport height per spec */
+      height: 35vh;
+      min-height: 200px;
+      padding: 0 24px;
+      padding-top: env(safe-area-inset-top, 0px);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding-bottom: 28px;
+    }
+    .login-ttl {
+      font-family: var(--font-t);
+      font-weight: 700;
+      font-size: 30px;
+      color: var(--offwhite);
+      letter-spacing: -0.4px;
+      line-height: 1.1;
+    }
+    .login-sub {
+      font-family: var(--font-t);
+      font-weight: 300;
+      font-size: 16px;
+      color: var(--mint);
+      margin-top: 6px;
+      letter-spacing: 0.2px;
+    }
+    .login-form {
+      flex: 1;
+      padding: 32px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .login-err {
+      font-family: var(--font-b);
+      font-size: 12px;
+      color: var(--danger);
+      text-align: center;
+      margin-bottom: 10px;
+      min-height: 16px;
+    }
+    .login-forgot {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font-b);
+      font-size: 13px;
+      color: var(--fg-muted);
+      text-align: center;
+      width: 100%;
+      margin-top: 16px;
+      padding: 6px;
+    }
+
+    /* ════════════════════════════════════════════════
+       HOME SCREEN
+    ════════════════════════════════════════════════ */
+    .home-hdr {
+      background: var(--teal);
+      padding: 0 20px 16px;
+      padding-top: max(16px, env(safe-area-inset-top, 0px));
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      flex-shrink: 0;
+      min-height: 80px;
+    }
+    .home-greet {
+      font-family: var(--font-b);
+      font-size: 12px;
+      color: var(--mint);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 2px;
+    }
+    .home-name {
+      font-family: var(--font-t);
+      font-weight: 600;
+      font-size: 22px;
+      color: var(--offwhite);
+      letter-spacing: -0.2px;
+    }
+    .home-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: var(--sh-card);
+      height: 96px;
+      padding: 0 22px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 16px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .home-card:active { opacity: 0.82; }
+    .home-card-ico {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      background: var(--offwhite);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .home-card-lbl {
+      font-family: var(--font-t);
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--teal);
+      letter-spacing: -0.2px;
+    }
+
+    /* ─── SVG icon sizes ─────────────────────────── */
+    .ico-chevron-r {
+      flex-shrink: 0;
+      color: var(--fg-subtle);
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ════════════════════════════════════════════
+       TELA 1 — LOGIN
+  ════════════════════════════════════════════ -->
+  <div id="screen-login" class="screen active">
+    <div class="login-hero">
+      <div class="login-ttl">CRM Visagio</div>
+      <div class="login-sub">acesso mobile</div>
+    </div>
+    <div class="login-form">
+      <div class="field">
+        <label class="field-lbl" for="l-email">E-mail corporativo <span class="req">*</span></label>
+        <input id="l-email" class="fi" type="email" placeholder="seu@visagio.com"
+               autocomplete="email" inputmode="email"
+               oninput="chkLogin()" />
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="l-pw">Senha <span class="req">*</span></label>
+        <input id="l-pw" class="fi" type="password" placeholder="••••••••"
+               autocomplete="current-password"
+               oninput="chkLogin()" onkeydown="if(event.key==='Enter')doLogin()" />
+      </div>
+      <div id="l-err" class="login-err"></div>
+      <button id="l-btn" class="btn-p" onclick="doLogin()" disabled>entrar</button>
+      <button class="login-forgot"
+        onclick="alert('Para recuperar sua senha, acesse a versão desktop do CRM.')">
+        Esqueci minha senha
+      </button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TELA 2 — HOME
+  ════════════════════════════════════════════ -->
+  <div id="screen-home" class="screen">
+    <div class="home-hdr">
+      <div>
+        <div class="home-greet" id="h-greet">bom dia</div>
+        <div class="home-name" id="h-name">olá</div>
+      </div>
+      <button onclick="doLogout()" style="background:transparent;border:none;cursor:pointer;padding:4px;"
+              title="Sair">
+        <!-- logout icon -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D6D5C9"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3"/>
+          <path d="M10 17l5-5-5-5"/>
+          <path d="M15 12H4"/>
+        </svg>
+      </button>
+    </div>
+    <div class="body" style="padding-top:24px;">
+
+      <div class="home-card" onclick="nav('contatos')">
+        <div class="home-card-ico">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00363D"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h14a2 2 0 012 2v12a2 2 0 01-2 2H4z"/>
+            <path d="M4 8H2M4 12H2M4 16H2"/>
+            <circle cx="13" cy="11" r="2.5"/>
+            <path d="M9 17c.7-1.8 2-2.5 4-2.5s3.3.7 4 2.5"/>
+          </svg>
+        </div>
+        <div class="home-card-lbl">Contatos</div>
+        <div style="flex:1"></div>
+        <svg class="ico-chevron-r" width="12" height="18" viewBox="0 0 12 18" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M3 3l6 6-6 6"/>
+        </svg>
+      </div>
+
+      <div class="home-card" onclick="nav('empresas')">
+        <div class="home-card-ico">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00363D"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="3" width="16" height="18" rx="1.5"/>
+            <path d="M8 7h2M8 11h2M8 15h2M14 7h2M14 11h2M14 15h2"/>
+            <path d="M10 21v-3h4v3"/>
+          </svg>
+        </div>
+        <div class="home-card-lbl">Empresas</div>
+        <div style="flex:1"></div>
+        <svg class="ico-chevron-r" width="12" height="18" viewBox="0 0 12 18" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M3 3l6 6-6 6"/>
+        </svg>
+      </div>
+
+      <div class="home-card" onclick="nav('leads')">
+        <div class="home-card-ico">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00363D"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 20h18"/>
+            <path d="M5 20V12M10 20V8M15 20V14M20 20V4"/>
+          </svg>
+        </div>
+        <div class="home-card-lbl">Comercial</div>
+        <div style="flex:1"></div>
+        <svg class="ico-chevron-r" width="12" height="18" viewBox="0 0 12 18" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M3 3l6 6-6 6"/>
+        </svg>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TELA 3 — CONTATOS LISTA
+  ════════════════════════════════════════════ -->
+  <div id="screen-contatos" class="screen">
+    <div class="hdr">
+      <button class="hdr-back" onclick="back()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A9FDAC"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+      <div class="hdr-title">Contatos</div>
+      <button class="hdr-fab" onclick="nav('novo-contato',initNovoContato)">+ novo</button>
+    </div>
+    <div class="body">
+      <div class="srch">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4D6066"
+             stroke-width="1.8" stroke-linecap="round">
+          <circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/>
+        </svg>
+        <input id="ct-srch" type="search" placeholder="Buscar contato..."
+               oninput="renderContatos(this.value)" />
+      </div>
+      <div class="sec-lbl mt0" id="ct-count">Meus contatos</div>
+      <div id="ct-list"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TELA 3a — NOVO CONTATO
+  ════════════════════════════════════════════ -->
+  <div id="screen-novo-contato" class="screen">
+    <div class="hdr">
+      <button class="hdr-back" onclick="back()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A9FDAC"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+      <div class="hdr-title">novo contato</div>
+    </div>
+    <div class="body">
+      <div class="sec-lbl mt0">Obrigatórios</div>
+
+      <div class="field">
+        <label class="field-lbl" for="nc-nome">Nome completo <span class="req">*</span></label>
+        <input id="nc-nome" class="fi" type="text" placeholder="Ex.: Ana Souza"
+               autocomplete="name" oninput="chkNC()" />
+      </div>
+
+      <div class="field ac-wrap">
+        <label class="field-lbl" for="nc-emp">Empresa <span class="req">*</span></label>
+        <input id="nc-emp" class="fi" type="text" placeholder="Buscar empresa cadastrada..."
+               autocomplete="off" oninput="acEmp('nc-emp','nc-emp-id','nc-emp-list',chkNC)" />
+        <input type="hidden" id="nc-emp-id" />
+        <div id="nc-emp-list" class="ac-list"></div>
+        <div class="fhint">começa a buscar na base ao digitar</div>
+      </div>
+
+      <div class="sec-lbl">Opcionais</div>
+
+      <div class="field">
+        <label class="field-lbl" for="nc-tel">Telefone</label>
+        <input id="nc-tel" class="fi" type="tel" placeholder="(11) 9 0000-0000"
+               autocomplete="tel" inputmode="tel" />
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="nc-email">E-mail</label>
+        <input id="nc-email" class="fi" type="email" placeholder="nome@empresa.com"
+               autocomplete="email" inputmode="email" />
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="nc-li">LinkedIn</label>
+        <input id="nc-li" class="fi" type="text" placeholder="linkedin.com/in/..." />
+      </div>
+
+      <div style="margin-top:8px;margin-bottom:24px">
+        <button class="btn-s" onclick="importarAgenda()">
+          <!-- agenda icon -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00363D"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+            <circle cx="12" cy="11" r="2.5"/>
+            <path d="M8 17c.7-1.8 2-2.5 4-2.5s3.3.7 4 2.5"/>
+          </svg>
+          importar da agenda
+        </button>
+      </div>
+
+      <button id="nc-btn" class="btn-p" onclick="saveNovoContato()" disabled>
+        salvar contato
+      </button>
+      <button class="btn-t" onclick="back()">cancelar</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TELA 3b — ATUALIZAR CONTATO
+  ════════════════════════════════════════════ -->
+  <div id="screen-atualizar-contato" class="screen">
+    <div class="hdr">
+      <button class="hdr-back" onclick="back()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A9FDAC"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+      <div class="hdr-title" id="ac-ttl">Contato</div>
+    </div>
+    <div class="body">
+      <input type="hidden" id="ac-id" />
+      <div class="sec-lbl mt0">Dados do contato</div>
+
+      <div class="field">
+        <label class="field-lbl" for="ac-nome">Nome completo <span class="req">*</span></label>
+        <input id="ac-nome" class="fi" type="text" oninput="chkAC()" />
+      </div>
+      <div class="field ac-wrap">
+        <label class="field-lbl" for="ac-emp">Empresa <span class="req">*</span></label>
+        <input id="ac-emp" class="fi" type="text" placeholder="Buscar empresa..."
+               autocomplete="off" oninput="acEmp('ac-emp','ac-emp-id','ac-emp-list')" />
+        <input type="hidden" id="ac-emp-id" />
+        <div id="ac-emp-list" class="ac-list"></div>
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="ac-tel">Telefone</label>
+        <input id="ac-tel" class="fi" type="tel" autocomplete="tel" inputmode="tel" />
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="ac-email">E-mail</label>
+        <input id="ac-email" class="fi" type="email" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="ac-li">LinkedIn</label>
+        <input id="ac-li" class="fi" type="text" />
+      </div>
+
+      <button id="ac-btn" class="btn-p" onclick="saveAtualizarContato()">salvar alterações</button>
+      <button id="ac-del" class="btn-t danger" onclick="confirmExcluirContato()"
+              style="display:none">excluir contato</button>
+
+      <div id="ac-meta" class="meta"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TELA 4 — EMPRESAS LISTA
+  ════════════════════════════════════════════ -->
+  <div id="screen-empresas" class="screen">
+    <div class="hdr">
+      <button class="hdr-back" onclick="back()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A9FDAC"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+      <div class="hdr-title">Empresas</div>
+      <button class="hdr-fab" onclick="nav('nova-empresa',initNovaEmpresa)">+ nova</button>
+    </div>
+    <div class="body">
+      <div class="srch">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4D6066"
+             stroke-width="1.8" stroke-linecap="round">
+          <circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/>
+        </svg>
+        <input id="em-srch" type="search" placeholder="Buscar empresa..."
+               oninput="renderEmpresas(this.value)" />
+      </div>
+      <div class="sec-lbl mt0" id="em-count">Empresas cadastradas</div>
+      <div id="em-list"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TELA 4a — NOVA EMPRESA
+  ════════════════════════════════════════════ -->
+  <div id="screen-nova-empresa" class="screen">
+    <div class="hdr">
+      <button class="hdr-back" onclick="back()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A9FDAC"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+      <div class="hdr-title">nova empresa</div>
+    </div>
+    <div class="body">
+      <div class="sec-lbl mt0">Obrigatório</div>
+
+      <div class="field">
+        <label class="field-lbl" for="ne-nome">Nome da empresa <span class="req">*</span></label>
+        <input id="ne-nome" class="fi" type="text" placeholder="Ex.: Bradesco" oninput="chkNE()" />
+      </div>
+
+      <div class="sec-lbl">Opcionais</div>
+
+      <div class="field">
+        <label class="field-lbl" for="ne-site">Site (URL)</label>
+        <input id="ne-site" class="fi" type="url" placeholder="https://..." inputmode="url" />
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="ne-end">Endereço</label>
+        <input id="ne-end" class="fi" type="text" placeholder="Cidade, estado" />
+      </div>
+
+      <div style="margin-top:8px"></div>
+      <button id="ne-btn" class="btn-p" onclick="saveNovaEmpresa()" disabled>salvar empresa</button>
+      <button class="btn-t" onclick="back()">cancelar</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TELA 4b — ATUALIZAR EMPRESA
+  ════════════════════════════════════════════ -->
+  <div id="screen-atualizar-empresa" class="screen">
+    <div class="hdr">
+      <button class="hdr-back" onclick="back()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A9FDAC"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+      <div class="hdr-title" id="ae-ttl">Empresa</div>
+    </div>
+    <div class="body">
+      <input type="hidden" id="ae-id" />
+      <div class="sec-lbl mt0">Dados da empresa</div>
+
+      <div class="field">
+        <label class="field-lbl" for="ae-nome">Nome da empresa <span class="req">*</span></label>
+        <input id="ae-nome" class="fi" type="text" oninput="chkAE()" />
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="ae-site">Site (URL)</label>
+        <input id="ae-site" class="fi" type="url" inputmode="url" />
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="ae-end">Endereço</label>
+        <input id="ae-end" class="fi" type="text" placeholder="Cidade, estado" />
+      </div>
+
+      <button id="ae-btn" class="btn-p" onclick="saveAtualizarEmpresa()">salvar alterações</button>
+
+      <div class="sec-lbl" id="ae-ct-lbl" style="display:none">Contatos vinculados</div>
+      <div id="ae-ct-list" class="mini-c-wrap" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TELA 5 — COMERCIAL / LEADS LISTA
+  ════════════════════════════════════════════ -->
+  <div id="screen-leads" class="screen">
+    <div class="hdr">
+      <button class="hdr-back" onclick="back()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A9FDAC"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+      <div class="hdr-title">Comercial</div>
+      <button class="hdr-fab" onclick="nav('novo-lead',initNovoLead)">+ novo</button>
+    </div>
+    <div class="body">
+      <div class="srch">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4D6066"
+             stroke-width="1.8" stroke-linecap="round">
+          <circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/>
+        </svg>
+        <input id="ld-srch" type="search" placeholder="Buscar lead ou empresa..."
+               oninput="renderLeads(this.value)" />
+      </div>
+      <div class="tabs">
+        <button id="tab-aberto" class="tab on" onclick="setTab('aberto')">em aberto</button>
+        <button id="tab-todos"  class="tab"    onclick="setTab('todos')">todos</button>
+      </div>
+      <div class="sec-lbl">Últimos leads — por data de contato</div>
+      <div id="ld-list"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TELA 5a — NOVO LEAD
+  ════════════════════════════════════════════ -->
+  <div id="screen-novo-lead" class="screen">
+    <div class="hdr">
+      <button class="hdr-back" onclick="back()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A9FDAC"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+      <div class="hdr-title">novo lead</div>
+    </div>
+    <div class="body">
+      <div class="sec-lbl mt0">Obrigatórios</div>
+
+      <div class="field">
+        <label class="field-lbl" for="nl-nome">Nome do lead / oportunidade <span class="req">*</span></label>
+        <input id="nl-nome" class="fi" type="text" placeholder="Ex.: Projeto Alfa" oninput="chkNL()" />
+      </div>
+      <div class="field ac-wrap">
+        <label class="field-lbl" for="nl-emp">Empresa <span class="req">*</span></label>
+        <input id="nl-emp" class="fi" type="text" placeholder="Buscar empresa cadastrada..."
+               autocomplete="off" oninput="acEmp('nl-emp','nl-emp-id','nl-emp-list',chkNL)" />
+        <input type="hidden" id="nl-emp-id" />
+        <div id="nl-emp-list" class="ac-list"></div>
+      </div>
+
+      <div class="sec-lbl">Opcionais</div>
+
+      <div class="field ac-wrap">
+        <label class="field-lbl" for="nl-ct">Contato principal</label>
+        <input id="nl-ct" class="fi" type="text" placeholder="Buscar contato na base..."
+               autocomplete="off" oninput="acCt('nl-ct','nl-ct-id','nl-ct-list')" />
+        <input type="hidden" id="nl-ct-id" />
+        <div id="nl-ct-list" class="ac-list"></div>
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="nl-st">Status</label>
+        <select id="nl-st" class="fs">
+          <option value="prospecto">Prospecção</option>
+          <option value="contato_mapeado">Qualificação</option>
+          <option value="oportunidade_proposta">Proposta</option>
+          <option value="proposta_submetida">Negociação</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-lbl" for="nl-obs">Observação</label>
+        <textarea id="nl-obs" class="fta" placeholder="Anotação rápida pós-reunião..."></textarea>
+      </div>
+
+      <div style="margin-top:8px"></div>
+      <button id="nl-btn" class="btn-p" onclick="saveNovoLead()" disabled>salvar lead</button>
+      <button class="btn-t" onclick="back()">cancelar</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       TELA 5b — ATUALIZAR LEAD
+  ════════════════════════════════════════════ -->
+  <div id="screen-atualizar-lead" class="screen">
+    <div class="hdr">
+      <button class="hdr-back" onclick="back()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A9FDAC"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+      <div class="hdr-title" id="al-ttl">Lead</div>
+    </div>
+    <div class="body">
+      <input type="hidden" id="al-id" />
+
+      <div class="sec-lbl mt0">Dados do lead</div>
+      <div class="g2">
+        <div class="field">
+          <label class="field-lbl" for="al-nome">Nome <span class="req">*</span></label>
+          <input id="al-nome" class="fi" type="text" oninput="chkAL()" />
+        </div>
+        <div class="field">
+          <label class="field-lbl" for="al-st">Status</label>
+          <select id="al-st" class="fs">
+            <option value="prospecto">Prospecção</option>
+            <option value="contato_mapeado">Qualificação</option>
+            <option value="oportunidade_proposta">Proposta</option>
+            <option value="proposta_submetida">Negociação</option>
+          </select>
+        </div>
+      </div>
+      <div class="field ac-wrap">
+        <label class="field-lbl" for="al-emp">Empresa <span class="req">*</span></label>
+        <input id="al-emp" class="fi" type="text" placeholder="Buscar empresa..."
+               autocomplete="off" oninput="acEmp('al-emp','al-emp-id','al-emp-list')" />
+        <input type="hidden" id="al-emp-id" />
+        <div id="al-emp-list" class="ac-list"></div>
+      </div>
+      <div class="field ac-wrap">
+        <label class="field-lbl" for="al-ct">Contato principal</label>
+        <input id="al-ct" class="fi" type="text" placeholder="Buscar contato..."
+               autocomplete="off" oninput="acCt('al-ct','al-ct-id','al-ct-list')" />
+        <input type="hidden" id="al-ct-id" />
+        <div id="al-ct-list" class="ac-list"></div>
+      </div>
+
+      <div class="sec-lbl">Registrar interação</div>
+      <div class="field">
+        <label class="field-lbl" id="al-ano-lbl">Nova anotação</label>
+        <textarea id="al-ano" class="fta" placeholder="O que aconteceu hoje?"></textarea>
+      </div>
+      <button id="al-btn" class="btn-p" onclick="saveAtualizarLead()">salvar atualização</button>
+
+      <div class="sec-lbl" style="margin-top:24px">Histórico</div>
+      <div id="al-hist"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       MODAL — confirmação
+  ════════════════════════════════════════════ -->
+  <div id="modal" class="modal-bg" onclick="closeModalBg(event)">
+    <div class="modal-sheet">
+      <div class="modal-ttl" id="modal-ttl"></div>
+      <div class="modal-body" id="modal-txt"></div>
+      <div class="modal-acts">
+        <button id="modal-ok" class="btn-p"></button>
+        <button class="btn-t" onclick="closeModal()">continuar editando</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script>
+// ════════════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════════════
+const SUPA_URL = 'https://xncbmptzxkcgggthqgeg.supabase.co';
+const SUPA_KEY = 'sb_publishable_mKL0k5BsL7gw-IHVPSy-9w_xCJPTC_M';
+const { createClient } = supabase;
+const db = createClient(SUPA_URL, SUPA_KEY);
+
+// ════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════
+let user        = null;
+let profile     = null;       // perfil do usuário logado
+let profilesMap = {};         // { uuid → display_name } — todos os usuários
+let contatos    = [];
+let empresas    = [];
+let leads       = [];
+let leadTab     = 'aberto';
+let stack       = [];          // navigation stack
+
+// Status display mapping
+const ST = {
+  prospecto:            { lbl:'PROSPECÇÃO',   css:'s-prosp'  },
+  contato_mapeado:      { lbl:'QUALIFICAÇÃO', css:'s-qual'   },
+  reuniao_realizada:    { lbl:'QUALIFICAÇÃO', css:'s-qual'   },
+  oportunidade_proposta:{ lbl:'PROPOSTA',     css:'s-prop'   },
+  proposta_submetida:   { lbl:'NEGOCIAÇÃO',   css:'s-neg'    },
+  proposta_aceita:      { lbl:'ACEITA',       css:'s-ganho'  },
+  proposta_perdida:     { lbl:'PERDIDA',      css:'s-perdido'},
+};
+// Statuses considered "em aberto"
+const OPEN = ['prospecto','contato_mapeado','reuniao_realizada','oportunidade_proposta','proposta_submetida'];
+
+// ════════════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════════════
+function nav(id, setup) {
+  const prev = stack[stack.length - 1];
+  if (prev) {
+    const el = $('screen-' + prev);
+    if (el) { el.classList.remove('active'); el.classList.add('exit'); }
+  }
+  stack.push(id);
+  const next = $('screen-' + id);
+  if (next) {
+    next.classList.remove('exit');
+    // Force reflow for animation
+    void next.offsetWidth;
+    next.classList.add('active');
+    const body = next.querySelector('.body');
+    if (body) body.scrollTop = 0;
+  }
+  if (setup) setup();
+}
+
+function back() {
+  if (stack.length <= 1) return;
+  const cur = stack.pop();
+  const curEl = $('screen-' + cur);
+  if (curEl) { curEl.classList.remove('active'); }
+
+  const prev = stack[stack.length - 1];
+  const prevEl = $('screen-' + prev);
+  if (prevEl) { prevEl.classList.remove('exit'); prevEl.classList.add('active'); }
+}
+
+function showLogin() {
+  stack = [];
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('active','exit');
+  });
+  const s = $('screen-login');
+  s.classList.remove('exit');
+  s.classList.add('active');
+}
+
+function showHome() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active','exit'));
+  stack = ['home'];
+  $('screen-home').classList.add('active');
+  updateGreeting();
+}
+
+// ════════════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════════════
+async function initAuth() {
+  const { data: { session } } = await db.auth.getSession();
+  if (session?.user) {
+    user = session.user;
+    await loadAll();
+    showHome();
+  } else {
+    showLogin();
+  }
+}
+
+db.auth.onAuthStateChange((ev, session) => {
+  if (ev === 'SIGNED_OUT') { user = null; showLogin(); }
+});
+
+async function doLogin() {
+  const email = $('l-email').value.trim();
+  const pw    = $('l-pw').value;
+  const btn   = $('l-btn');
+  const err   = $('l-err');
+
+  err.textContent = '';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>';
+
+  const { data, error } = await db.auth.signInWithPassword({ email, password: pw });
+
+  btn.innerHTML = 'entrar';
+  btn.disabled  = false;
+
+  if (error) {
+    err.textContent = 'E-mail ou senha incorretos.';
+    return;
+  }
+
+  user = data.user;
+  await loadAll();
+  showHome();
+}
+
+async function doLogout() {
+  await db.auth.signOut();
+}
+
+function chkLogin() {
+  const ok = $('l-email').value.includes('@') && $('l-pw').value.length >= 4;
+  $('l-btn').disabled = !ok;
+}
+
+function updateGreeting() {
+  const h = new Date().getHours();
+  $('h-greet').textContent = h < 12 ? 'bom dia' : h < 18 ? 'boa tarde' : 'boa noite';
+  // Usa display_name do perfil; fallback para parte do e-mail
+  const name = profile?.display_name || user?.email?.split('@')[0] || '';
+  const first = name.split(' ')[0];
+  $('h-name').textContent = 'olá, ' + (first.charAt(0).toUpperCase() + first.slice(1));
+}
+
+// ════════════════════════════════════════════════════════
+//  DATA LOADING
+// ════════════════════════════════════════════════════════
+async function loadAll() {
+  await Promise.all([loadProfiles(), loadContatos(), loadEmpresas(), loadLeads()]);
+}
+
+async function loadProfiles() {
+  const { data } = await db.from('profiles').select('id, display_name, email');
+  profilesMap = {};
+  (data || []).forEach(p => { profilesMap[p.id] = p.display_name || p.email || '—'; });
+  profile = data?.find(p => p.id === user?.id) || null;
+}
+
+async function loadContatos() {
+  const { data } = await db
+    .from('pessoas')
+    .select('*, empresas(nome)')
+    .order('nome');
+  contatos = data || [];
+  renderContatos();
+}
+
+async function loadEmpresas() {
+  const { data } = await db.from('empresas').select('*').order('nome');
+  empresas = data || [];
+  renderEmpresas();
+}
+
+async function loadLeads() {
+  const { data } = await db
+    .from('leads')
+    .select('*, empresas(nome)')
+    .order('updated_at', { ascending: false });
+  leads = data || [];
+  renderLeads();
+}
+
+// ════════════════════════════════════════════════════════
+//  RENDER — CONTATOS
+// ════════════════════════════════════════════════════════
+function renderContatos(q = '') {
+  const list = $('ct-list');
+  const count = $('ct-count');
+  if (!list) return;
+
+  const f = q
+    ? contatos.filter(c =>
+        c.nome.toLowerCase().includes(q.toLowerCase()) ||
+        (c.empresas?.nome||'').toLowerCase().includes(q.toLowerCase()))
+    : contatos;
+
+  count.textContent = `Meus contatos · ${f.length}`;
+
+  if (!f.length) {
+    list.innerHTML = `<div class="empty">Nenhum contato encontrado.<br>Toque em <strong>+ novo</strong> para adicionar.</div>`;
+    return;
+  }
+  list.innerHTML = f.map(c => `
+    <div class="card" onclick="openContato('${c.id}')">
+      <div class="card-ico">${icoP(20)}</div>
+      <div class="card-body">
+        <div class="card-title">${x(c.nome)}</div>
+        <div class="card-sub">${x(c.empresas?.nome||'—')}</div>
+      </div>
+      <svg class="ico-chevron-r" width="10" height="14" viewBox="0 0 10 14" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M2 2l5 5-5 5"/>
+      </svg>
+    </div>`).join('');
+}
+
+function openContato(id) {
+  const c = contatos.find(c => c.id === id);
+  if (!c) return;
+  $('ac-id').value         = c.id;
+  $('ac-ttl').textContent  = c.nome;
+  $('ac-nome').value       = c.nome || '';
+  $('ac-emp').value        = c.empresas?.nome || '';
+  $('ac-emp-id').value     = c.empresa_atual_id || '';
+  $('ac-tel').value        = c.telefone || '';
+  $('ac-email').value      = c.email || '';
+  $('ac-li').value         = c.linkedin_url || '';
+
+  // "criado por [Nome]" — busca no profilesMap pelo UUID do criador
+  const isCreator   = c.created_by === user?.id;
+  const creatorName = c.created_by ? (profilesMap[c.created_by] || '—') : null;
+  $('ac-meta').textContent = creatorName
+    ? `criado por ${creatorName} em ${fmtDate(c.created_at)}`
+    : `criado em ${fmtDate(c.created_at)}`;
+
+  // Botão excluir visível apenas para o criador do registro
+  $('ac-del').style.display = isCreator ? 'block' : 'none';
+
+  $('ac-btn').disabled = false;
+  nav('atualizar-contato');
+}
+
+// ════════════════════════════════════════════════════════
+//  RENDER — EMPRESAS
+// ════════════════════════════════════════════════════════
+function renderEmpresas(q = '') {
+  const list  = $('em-list');
+  const count = $('em-count');
+  if (!list) return;
+
+  const f = q
+    ? empresas.filter(e => e.nome.toLowerCase().includes(q.toLowerCase()))
+    : empresas;
+
+  count.textContent = `Empresas cadastradas · ${f.length}`;
+
+  if (!f.length) {
+    list.innerHTML = `<div class="empty">Nenhuma empresa encontrada.<br>Toque em <strong>+ nova</strong> para adicionar.</div>`;
+    return;
+  }
+  list.innerHTML = f.map(e => `
+    <div class="card" onclick="openEmpresa('${e.id}')">
+      <div class="card-ico">${icoB(20)}</div>
+      <div class="card-body">
+        <div class="card-title">${x(e.nome)}</div>
+        <div class="card-sub">${x(e.website||'—')}</div>
+      </div>
+      <svg class="ico-chevron-r" width="10" height="14" viewBox="0 0 10 14" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M2 2l5 5-5 5"/>
+      </svg>
+    </div>`).join('');
+}
+
+async function openEmpresa(id) {
+  const e = empresas.find(e => e.id === id);
+  if (!e) return;
+  $('ae-id').value   = e.id;
+  $('ae-ttl').textContent = e.nome;
+  $('ae-nome').value = e.nome || '';
+  $('ae-site').value = e.website || '';
+  const end = [e.cidade, e.estado].filter(Boolean).join(', ');
+  $('ae-end').value  = end;
+  $('ae-btn').disabled = false;
+  nav('atualizar-empresa');
+  await loadCtEmpresa(id);
+}
+
+async function loadCtEmpresa(empId) {
+  const { data } = await db
+    .from('pessoas').select('nome').eq('empresa_atual_id', empId).order('nome');
+
+  const lbl  = $('ae-ct-lbl');
+  const wrap = $('ae-ct-list');
+
+  if (!data?.length) { lbl.style.display='none'; wrap.style.display='none'; return; }
+
+  lbl.style.display = '';
+  lbl.textContent   = `Contatos vinculados · ${data.length}`;
+  wrap.style.display= '';
+  wrap.innerHTML = data.map((c,i) => `
+    <div class="mini-c">
+      <div class="mini-c-ava">${icoP(16)}</div>
+      <div>
+        <div class="mini-c-name">${x(c.nome)}</div>
+      </div>
+    </div>
+    ${i < data.length-1 ? '<div class="mini-c-div"></div>' : ''}`).join('');
+}
+
+// ════════════════════════════════════════════════════════
+//  RENDER — LEADS
+// ════════════════════════════════════════════════════════
+function renderLeads(q = '') {
+  const list = $('ld-list');
+  if (!list) return;
+
+  const q2 = (q || $('ld-srch')?.value || '').toLowerCase();
+
+  let f = q2
+    ? leads.filter(l =>
+        (l.nome_oportunidade||'').toLowerCase().includes(q2) ||
+        (l.empresas?.nome||'').toLowerCase().includes(q2))
+    : leads;
+
+  if (leadTab === 'aberto') f = f.filter(l => OPEN.includes(l.status));
+
+  if (!f.length) {
+    list.innerHTML = `<div class="empty">Nenhum lead encontrado.</div>`;
+    return;
+  }
+  list.innerHTML = f.map(l => {
+    const st = ST[l.status] || { lbl: l.status?.toUpperCase()||'?', css:'s-prosp' };
+    return `
+    <div class="lead-card" onclick="openLead('${l.id}')">
+      <div class="lead-top">
+        <div class="card-ico">${icoTrend(18)}</div>
+        <div class="card-body">
+          <div class="card-title">${x(l.nome_oportunidade||'Sem nome')}</div>
+          <div class="card-sub">${x(l.empresas?.nome||'—')}</div>
+        </div>
+        <svg class="ico-chevron-r" width="10" height="14" viewBox="0 0 10 14" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M2 2l5 5-5 5"/>
+        </svg>
+      </div>
+      <div class="lead-bot">
+        <span class="stag ${st.css}">${st.lbl}</span>
+        <span class="lead-date">${fmtDate(l.updated_at)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setTab(t) {
+  leadTab = t;
+  $('tab-aberto').classList.toggle('on', t==='aberto');
+  $('tab-todos').classList.toggle('on', t==='todos');
+  renderLeads();
+}
+
+async function openLead(id) {
+  const l = leads.find(l => l.id === id);
+  if (!l) return;
+
+  $('al-id').value   = l.id;
+  $('al-ttl').textContent = l.nome_oportunidade || 'Lead';
+  $('al-nome').value = l.nome_oportunidade || '';
+  $('al-st').value   = OPEN.includes(l.status) ? l.status : 'prospecto';
+  $('al-emp').value  = l.empresas?.nome || '';
+  $('al-emp-id').value = l.empresa_id || '';
+  $('al-ano').value  = '';
+
+  const today = new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
+  $('al-ano-lbl').textContent = `Nova anotação · ${today}`;
+
+  nav('atualizar-lead');
+
+  // Load contato and history concurrently
+  await Promise.all([loadLeadCt(id), loadHist(id)]);
+}
+
+async function loadLeadCt(leadId) {
+  const { data } = await db
+    .from('lead_contatos')
+    .select('pessoa_id, pessoas(nome)')
+    .eq('lead_id', leadId)
+    .limit(1);
+
+  $('al-ct').value    = data?.[0]?.pessoas?.nome || '';
+  $('al-ct-id').value = data?.[0]?.pessoa_id || '';
+}
+
+async function loadHist(leadId) {
+  const { data } = await db
+    .from('interacoes')
+    .select('*')
+    .eq('lead_id', leadId)
+    .order('data', { ascending: false });
+
+  const el = $('al-hist');
+  if (!data?.length) {
+    el.innerHTML = `<div class="empty" style="padding:16px 0">Sem histórico de interações.</div>`;
+    return;
+  }
+  el.innerHTML = data.map(i => {
+    const d    = new Date(i.data || i.created_at);
+    const date = d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
+    const tipo = (i.tipo||'anotação').replace(/_/g,' ');
+    const body = i.descricao || i.resultado || '';
+    return `
+    <div class="hist">
+      <div class="hist-hdr">
+        <span class="hist-date">${date}</span>
+        <span class="hist-title">${x(tipo)}</span>
+      </div>
+      ${body ? `<div class="hist-body">${x(body)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+//  SAVE — CONTATOS
+// ════════════════════════════════════════════════════════
+function initNovoContato() {
+  ['nc-nome','nc-emp','nc-tel','nc-email','nc-li'].forEach(id => $(id).value = '');
+  $('nc-emp-id').value = '';
+  $('nc-btn').disabled = true;
+}
+
+function chkNC() {
+  $('nc-btn').disabled = !($('nc-nome').value.trim() && $('nc-emp-id').value);
+}
+
+async function saveNovoContato() {
+  const btn = $('nc-btn');
+  setLoading(btn, true, 'salvar contato');
+
+  const { error } = await db.from('pessoas').insert({
+    nome:            $('nc-nome').value.trim(),
+    empresa_atual_id:$('nc-emp-id').value || null,
+    telefone:        $('nc-tel').value.trim()  || null,
+    email:           $('nc-email').value.trim() || null,
+    linkedin_url:    $('nc-li').value.trim()   || null,
+    created_by:      user?.id || null,
+  });
+
+  setLoading(btn, false, 'salvar contato');
+  if (error) { toast('Erro ao salvar. Tente novamente.'); return; }
+
+  await loadContatos();
+  back();
+  toast('Contato salvo com sucesso ✓');
+}
+
+function chkAC() { $('ac-btn').disabled = !$('ac-nome').value.trim(); }
+
+async function saveAtualizarContato() {
+  const btn = $('ac-btn');
+  setLoading(btn, true, 'salvar alterações');
+
+  const { error } = await db.from('pessoas').update({
+    nome:            $('ac-nome').value.trim(),
+    empresa_atual_id:$('ac-emp-id').value || null,
+    telefone:        $('ac-tel').value.trim()   || null,
+    email:           $('ac-email').value.trim()  || null,
+    linkedin_url:    $('ac-li').value.trim()    || null,
+  }).eq('id', $('ac-id').value);
+
+  setLoading(btn, false, 'salvar alterações');
+  if (error) { toast('Erro ao salvar.'); return; }
+
+  await loadContatos();
+  back();
+  toast('Contato atualizado ✓');
+}
+
+function confirmExcluirContato() {
+  openModal(
+    'Excluir contato?',
+    'Esta ação é permanente e não pode ser desfeita.',
+    'excluir',
+    async () => {
+      const { error } = await db.from('pessoas').delete().eq('id', $('ac-id').value);
+      if (!error) { await loadContatos(); back(); toast('Contato excluído'); }
+    }
+  );
+}
+
+// ════════════════════════════════════════════════════════
+//  SAVE — EMPRESAS
+// ════════════════════════════════════════════════════════
+function initNovaEmpresa() {
+  ['ne-nome','ne-site','ne-end'].forEach(id => $(id).value = '');
+  $('ne-btn').disabled = true;
+}
+
+function chkNE() { $('ne-btn').disabled = !$('ne-nome').value.trim(); }
+
+async function saveNovaEmpresa() {
+  const btn = $('ne-btn');
+  setLoading(btn, true, 'salvar empresa');
+
+  const end   = $('ne-end').value.trim().split(',').map(s=>s.trim());
+  const { error } = await db.from('empresas').insert({
+    nome:    $('ne-nome').value.trim(),
+    website: $('ne-site').value.trim() || null,
+    cidade:  end[0] || null,
+    estado:  end[1] || null,
+  });
+
+  setLoading(btn, false, 'salvar empresa');
+  if (error) { toast('Erro ao salvar.'); return; }
+
+  await loadEmpresas();
+  back();
+  toast('Empresa salva com sucesso ✓');
+}
+
+function chkAE() { $('ae-btn').disabled = !$('ae-nome').value.trim(); }
+
+async function saveAtualizarEmpresa() {
+  const btn = $('ae-btn');
+  setLoading(btn, true, 'salvar alterações');
+
+  const end = $('ae-end').value.trim().split(',').map(s=>s.trim());
+  const { error } = await db.from('empresas').update({
+    nome:    $('ae-nome').value.trim(),
+    website: $('ae-site').value.trim() || null,
+    cidade:  end[0] || null,
+    estado:  end[1] || null,
+  }).eq('id', $('ae-id').value);
+
+  setLoading(btn, false, 'salvar alterações');
+  if (error) { toast('Erro ao salvar.'); return; }
+
+  await loadEmpresas();
+  back();
+  toast('Empresa atualizada ✓');
+}
+
+// ════════════════════════════════════════════════════════
+//  SAVE — LEADS
+// ════════════════════════════════════════════════════════
+function initNovoLead() {
+  ['nl-nome','nl-emp','nl-ct','nl-obs'].forEach(id => $(id).value = '');
+  ['nl-emp-id','nl-ct-id'].forEach(id => $(id).value = '');
+  $('nl-st').value = 'prospecto';
+  $('nl-btn').disabled = true;
+}
+
+function chkNL() {
+  $('nl-btn').disabled = !($('nl-nome').value.trim() && $('nl-emp-id').value);
+}
+
+async function saveNovoLead() {
+  const btn = $('nl-btn');
+  setLoading(btn, true, 'salvar lead');
+
+  const { data: ld, error } = await db.from('leads').insert({
+    nome_oportunidade: $('nl-nome').value.trim(),
+    empresa_id:        $('nl-emp-id').value || null,
+    status:            $('nl-st').value,
+    responsavel:       user?.email || null,
+    created_by:        user?.id || null,
+  }).select().single();
+
+  if (error) { setLoading(btn, false, 'salvar lead'); toast('Erro ao salvar.'); return; }
+
+  // Link main contact
+  const ctId = $('nl-ct-id').value;
+  if (ctId && ld?.id) {
+    await db.from('lead_contatos').insert({ lead_id: ld.id, pessoa_id: ctId });
+  }
+
+  // Save obs as interaction
+  const obs = $('nl-obs').value.trim();
+  if (obs && ld?.id) {
+    await db.from('interacoes').insert({
+      lead_id:  ld.id,
+      tipo:     'follow_up',
+      data:     new Date().toISOString(),
+      descricao: obs,
+    });
+  }
+
+  setLoading(btn, false, 'salvar lead');
+  await loadLeads();
+  back();
+  toast('Lead salvo com sucesso ✓');
+}
+
+function chkAL() { $('al-btn').disabled = !$('al-nome').value.trim(); }
+
+async function saveAtualizarLead() {
+  const btn = $('al-btn');
+  setLoading(btn, true, 'salvar atualização');
+
+  const id = $('al-id').value;
+
+  const { error } = await db.from('leads').update({
+    nome_oportunidade: $('al-nome').value.trim(),
+    empresa_id:        $('al-emp-id').value || null,
+    status:            $('al-st').value,
+  }).eq('id', id);
+
+  if (error) { setLoading(btn, false, 'salvar atualização'); toast('Erro ao salvar.'); return; }
+
+  // Upsert main contact
+  const ctId = $('al-ct-id').value;
+  if (ctId) {
+    await db.from('lead_contatos')
+      .upsert({ lead_id: id, pessoa_id: ctId }, { onConflict: 'lead_id,pessoa_id' });
+  }
+
+  // Save new annotation as interaction
+  const ano = $('al-ano').value.trim();
+  if (ano) {
+    await db.from('interacoes').insert({
+      lead_id:   id,
+      tipo:      'follow_up',
+      data:      new Date().toISOString(),
+      descricao: ano,
+    });
+    $('al-ano').value = '';
+  }
+
+  setLoading(btn, false, 'salvar atualização');
+
+  // Refresh without leaving screen
+  await Promise.all([loadLeads(), loadHist(id)]);
+  back();
+  toast('Lead atualizado ✓');
+}
+
+// ════════════════════════════════════════════════════════
+//  AUTOCOMPLETE
+// ════════════════════════════════════════════════════════
+function acEmp(inId, hidId, lstId, cb) {
+  $(hidId).value = ''; // clear selection on typing
+  const q   = $(inId).value.toLowerCase();
+  const lst = $(lstId);
+
+  if (q.length < 1) { lst.style.display='none'; if(cb)cb(); return; }
+
+  const hits = empresas.filter(e => e.nome.toLowerCase().includes(q)).slice(0,8);
+  if (!hits.length) { lst.style.display='none'; if(cb)cb(); return; }
+
+  lst.innerHTML = hits.map(e =>
+    `<div class="ac-item" onclick="pickEmp('${inId}','${hidId}','${lstId}','${esc(e.nome)}','${e.id}',${cb?'true':'false'})">
+       ${x(e.nome)}
+     </div>`).join('');
+  lst.style.display = 'block';
+  if (cb) cb();
+}
+
+function pickEmp(inId, hidId, lstId, nome, id, hasCb) {
+  $(inId).value  = nome;
+  $(hidId).value = id;
+  $(lstId).style.display = 'none';
+  if (hasCb) {
+    // determine which form
+    if (inId.startsWith('nc-')) chkNC();
+    else if (inId.startsWith('nl-')) chkNL();
+  }
+}
+
+function acCt(inId, hidId, lstId) {
+  $(hidId).value = '';
+  const q   = $(inId).value.toLowerCase();
+  const lst = $(lstId);
+
+  if (q.length < 1) { lst.style.display='none'; return; }
+
+  const hits = contatos.filter(c => c.nome.toLowerCase().includes(q)).slice(0,8);
+  if (!hits.length) { lst.style.display='none'; return; }
+
+  lst.innerHTML = hits.map(c =>
+    `<div class="ac-item" onclick="pickCt('${inId}','${hidId}','${lstId}','${esc(c.nome)}','${c.id}')">
+       ${x(c.nome)}
+       <span style="color:var(--fg-subtle);font-size:12px;margin-left:8px">${x(c.empresas?.nome||'')}</span>
+     </div>`).join('');
+  lst.style.display = 'block';
+}
+
+function pickCt(inId, hidId, lstId, nome, id) {
+  $(inId).value  = nome;
+  $(hidId).value = id;
+  $(lstId).style.display = 'none';
+}
+
+// Close autocomplete on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ac-wrap')) {
+    document.querySelectorAll('.ac-list').forEach(l => l.style.display='none');
+  }
+});
+
+// ════════════════════════════════════════════════════════
+//  IMPORTAR DA AGENDA (Contact Picker API — Android/iOS PWA)
+// ════════════════════════════════════════════════════════
+async function importarAgenda() {
+  if (!('contacts' in navigator)) {
+    toast('Não suportado neste navegador');
+    return;
+  }
+  try {
+    const cts = await navigator.contacts.select(
+      ['name','tel','email'],
+      { multiple: false }
+    );
+    if (cts.length) {
+      const c = cts[0];
+      if (c.name?.[0])  $('nc-nome').value  = c.name[0];
+      if (c.tel?.[0])   $('nc-tel').value   = c.tel[0];
+      if (c.email?.[0]) $('nc-email').value = c.email[0];
+      chkNC();
+    }
+  } catch(e) {
+    toast('Não foi possível acessar a agenda');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  MODAL
+// ════════════════════════════════════════════════════════
+function openModal(ttl, txt, okLbl, onOk) {
+  $('modal-ttl').textContent  = ttl;
+  $('modal-txt').textContent  = txt;
+  $('modal-ok').textContent   = okLbl;
+  $('modal-ok').onclick = () => { closeModal(); onOk(); };
+  $('modal').classList.add('open');
+}
+
+function closeModal()       { $('modal').classList.remove('open'); }
+function closeModalBg(e)   { if (e.target === $('modal')) closeModal(); }
+
+// ════════════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════════════
+let _tt;
+function toast(msg) {
+  clearTimeout(_tt);
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div');
+  t.className   = 'toast';
+  t.textContent = msg;
+  $('app').appendChild(t);
+  _tt = setTimeout(() => t.remove(), 2600);
+}
+
+// ════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════
+function $(id) { return document.getElementById(id); }
+
+function x(s) {           // HTML-escape
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function esc(s) {         // single-quote-safe for onclick attrs
+  if (!s) return '';
+  return s.replace(/'/g,"\\'").replace(/</g,'&lt;');
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
+}
+
+function setLoading(btn, on, label) {
+  btn.disabled = on;
+  btn.innerHTML = on ? '<span class="spin"></span>' : label;
+}
+
+// ─── Inline SVG icons ──────────────────────────
+function icoP(sz=20) {
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none"
+    stroke="#00363D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="8" r="4"/>
+    <path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>
+  </svg>`;
+}
+function icoB(sz=20) {
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none"
+    stroke="#00363D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="3" width="16" height="18" rx="1.5"/>
+    <path d="M8 7h2M8 11h2M8 15h2M14 7h2M14 11h2M14 15h2"/>
+    <path d="M10 21v-3h4v3"/>
+  </svg>`;
+}
+function icoTrend(sz=18) {
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none"
+    stroke="#00363D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 17l6-6 4 4 8-9"/>
+    <path d="M14 6h7v7"/>
+  </svg>`;
+}
+
+// ════════════════════════════════════════════════════════
+//  BOOT
+// ════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // Login field watcher
+  $('l-email').addEventListener('input', chkLogin);
+  $('l-pw').addEventListener('input', chkLogin);
+  $('l-pw').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+  setTimeout(() => $('l-email')?.focus(), 100);
+
+  initAuth();
+});
+</script>
+</body>
+</html>
